@@ -7,6 +7,12 @@ This repository contains the code needed to measure memorization in LLMs using i
 
 ## Getting Started
 
+### Install virtual environment
+
+`python3 -m venv .acr-memorization`
+
+Activate via: `source .acr-memorization/bin/activate`
+
 ### Requirements
 This code was developed and tested with Python 3.10.4. After cloning the repository, you can install the requirements and run our experiments.
 

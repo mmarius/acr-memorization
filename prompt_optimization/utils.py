@@ -2,6 +2,7 @@
 utils.py
 functions for preparing text for discrete optimization
 """
+
 import datetime
 import json
 
@@ -31,36 +32,86 @@ def load_target_str(dataset_name, idx, tokenizer):
         target_ids = torch.randint(0, tokenizer.vocab_size, (100, 20))[idx, :len]
         target_str = tokenizer.decode(target_ids)
     else:
-        raise ValueError(f"args.dataset = {dataset_name}, but that option isn't implemented.")
+        raise ValueError(
+            f"args.dataset = {dataset_name}, but that option isn't implemented."
+        )
     return target_str
 
 
-def prep_text(input_str, target_str, tokenizer, system_prompt, chat_template, num_free_tokens, device):
-    input_tokens = tokenizer.encode(input_str, return_tensors="pt", add_special_tokens=False).to(device=device)
-    target_tokens = tokenizer.encode(target_str, return_tensors="pt", add_special_tokens=False).to(device=device)
-    system_prompt_tokens = tokenizer.encode(system_prompt, return_tensors="pt", add_special_tokens=False).to(
-        device=device)
+def prep_text(
+    input_str,
+    target_str,
+    tokenizer,
+    system_prompt,
+    chat_template,
+    num_free_tokens,
+    device,
+):
+    # TODO(mm): this should be model specific
+    input_tokens = tokenizer.encode(
+        input_str, return_tensors="pt", add_special_tokens=False
+    ).to(device=device)
+    target_tokens = tokenizer.encode(
+        target_str, return_tensors="pt", add_special_tokens=False
+    ).to(device=device)
+    system_prompt_tokens = tokenizer.encode(
+        system_prompt, return_tensors="pt", add_special_tokens=False
+    ).to(device=device)
     chat_template_tokens = (
-        tokenizer.encode(chat_template[0], return_tensors="pt", add_special_tokens=False).to(device=device),
-        tokenizer.encode(chat_template[1], return_tensors="pt", add_special_tokens=False).to(device=device))
-    free_tokens = torch.randint(0, tokenizer.vocab_size, (1, num_free_tokens)).to(device=device)
+        tokenizer.encode(
+            chat_template[0], return_tensors="pt", add_special_tokens=False
+        ).to(device=device),
+        tokenizer.encode(
+            chat_template[1], return_tensors="pt", add_special_tokens=False
+        ).to(device=device),
+    )
+    free_tokens = torch.randint(0, tokenizer.vocab_size, (1, num_free_tokens)).to(
+        device=device
+    )
 
-    input_ids = torch.cat((chat_template_tokens[0], system_prompt_tokens, input_tokens, free_tokens,
-                           chat_template_tokens[1], target_tokens), dim=1).squeeze().long()
+    input_ids = (
+        torch.cat(
+            (
+                torch.tensor(tokenizer.bos_token_id).reshape(-1, 1).to(device),  # manually add the bos token for pythia models TODO(mm): write a function that takes care of this depending on which model we are using
+                system_prompt_tokens,
+                chat_template_tokens[0],
+                input_tokens,
+                free_tokens,
+                chat_template_tokens[1],
+                target_tokens,
+            ),
+            dim=1,
+        )
+        .squeeze()
+        .long()
+    )
 
     # build slice objects
-    tokens_before_free = chat_template_tokens[0].size(-1) + system_prompt_tokens.size(-1) + input_tokens.size(-1)
-    free_token_slice = slice(tokens_before_free, tokens_before_free + free_tokens.size(-1))
+    tokens_before_free = (
+        1 # bos token TODO(mm): write a function that takes care of this depending on which model we are using
+        + chat_template_tokens[0].size(-1)
+        + system_prompt_tokens.size(-1)
+        + input_tokens.size(-1)
+    )
+    free_token_slice = slice(
+        tokens_before_free, tokens_before_free + free_tokens.size(-1)
+    )
     input_slice = slice(0, input_ids.size(-1) - target_tokens.size(-1))
-    target_slice = slice(input_ids.size(-1) - target_tokens.size(-1), input_ids.size(-1))
-    loss_slice = slice(input_ids.size(-1) - target_tokens.size(-1) - 1, input_ids.size(-1) - 1)
+    target_slice = slice(
+        input_ids.size(-1) - target_tokens.size(-1), input_ids.size(-1)
+    )
+    loss_slice = slice(
+        input_ids.size(-1) - target_tokens.size(-1) - 1, input_ids.size(-1) - 1
+    )
 
     return input_ids, free_token_slice, input_slice, target_slice, loss_slice
 
 
 def check_output_with_hard_tokens(model, input_ids, target_slice, loss_slice):
     output = model(input_ids)
-    match = (output.logits[0, loss_slice].argmax(-1) == input_ids[0, target_slice].squeeze()).all()
+    match = (
+        output.logits[0, loss_slice].argmax(-1) == input_ids[0, target_slice].squeeze()
+    ).all()
     return match
 
 

@@ -20,7 +20,9 @@ discrete_optimizer: gcg
 experiment_name: ${model_name}_${discrete_optimizer}_${lr}_${batch_size}_${num_steps}_${topk}_${seed}
 input_str: ''
 lr: 0.01
-max_tokens: -1
+n_tokens_in_prompt: 10
+max_tokens: 30
+stop_early: false
 mini_batch_size: 100
 model_name: EleutherAI/pythia-410m
 num_steps: 200
@@ -29,6 +31,6 @@ random_weights: false
 run_id: ${generate_id:}
 seed: 42
 system_prompt: ''
-target_str: jumps over the lazy dog
+target_str: To be or not to be, that is the question.
 topk: 250
 
